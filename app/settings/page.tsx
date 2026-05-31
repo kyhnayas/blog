@@ -114,7 +114,8 @@ export default function ProfileSettings() {
           adsense_pub_id: adsensePubId.trim(),
           adsense_slot_id: adsenseSlotId.trim(),
         })
-        .match({ id: user.id })
+        .eq('id', user.id)
+        .select()
 
       console.log('Update response:', { error })
       if (error) {
