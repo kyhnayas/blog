@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, User, ArrowRight, Sparkles, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default function Login() {
   const router = useRouter()
   const searchParams = useSearchParams()
