@@ -104,15 +104,18 @@ export default function ProfileSettings() {
           avatar_url: avatarUrl.trim(),
           adsense_pub_id: adsensePubId.trim(),
           adsense_slot_id: adsenseSlotId.trim(),
-          updated_at: new Date().toISOString(),
         })
         .eq('id', user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Update error:', error)
+        throw error
+      }
 
       setMessage({ type: 'success', text: 'Your profile settings have been updated successfully!' })
       router.refresh()
     } catch (err: any) {
+      console.error('Save error:', err)
       setMessage({ type: 'error', text: err.message || 'An error occurred while updating settings.' })
     } finally {
       setSaving(false)
