@@ -84,8 +84,12 @@ export default function ProfileSettings() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
-    
+    console.log('handleSave started', { user, username })
+    if (!user) {
+      console.log('No user, returning')
+      return
+    }
+
     setSaving(true)
     setMessage(null)
 
@@ -94,6 +98,7 @@ export default function ProfileSettings() {
         throw new Error('Username must be at least 3 characters long.')
       }
 
+      console.log('About to update profiles table')
       // Update database profile
       const { error } = await supabase
         .from('profiles')
@@ -107,6 +112,7 @@ export default function ProfileSettings() {
         })
         .eq('id', user.id)
 
+      console.log('Update response:', { error })
       if (error) {
         console.error('Update error:', error)
         throw error
