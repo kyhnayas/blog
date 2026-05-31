@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Calendar, Eye, ArrowLeft, Heart, UserPlus, UserCheck, Loader2, Sparkles, Twitter, Facebook, Linkedin } from 'lucide-react'
+import { Calendar, Eye, ArrowLeft, Heart, UserPlus, UserCheck, Loader2, Sparkles, Share2, MessageCircle, Send } from 'lucide-react'
 import AdComponent from '@/components/AdComponent'
 
 interface PostClientProps {
@@ -143,25 +143,28 @@ export default function PostClient({ post, author, initialFollowers }: PostClien
             <div className="h-px w-6 bg-zinc-200 dark:bg-zinc-800 mx-auto my-3"></div>
             
             <a 
-              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.origin + '/posts/' + post.slug)}&text=${encodeURIComponent(post.title)}`}
+              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent((typeof window !== 'undefined' ? window.location.origin : 'https://kayhanayas.com') + '/posts/' + post.slug)}&text=${encodeURIComponent(post.title)}`}
               target="_blank"
               className="h-10 w-10 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-[#1DA1F2] hover:border-[#1DA1F2]/20 transition-all"
+              title="Share on X (Twitter)"
             >
-              <Twitter className="h-4.5 w-4.5" />
+              <Share2 className="h-4.5 w-4.5" />
             </a>
             <a 
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.origin + '/posts/' + post.slug)}`}
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent((typeof window !== 'undefined' ? window.location.origin : 'https://kayhanayas.com') + '/posts/' + post.slug)}`}
               target="_blank"
               className="h-10 w-10 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-[#1877F2] hover:border-[#1877F2]/20 transition-all"
+              title="Share on Facebook"
             >
-              <Facebook className="h-4.5 w-4.5" />
+              <MessageCircle className="h-4.5 w-4.5" />
             </a>
             <a 
-              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.origin + '/posts/' + post.slug)}`}
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent((typeof window !== 'undefined' ? window.location.origin : 'https://kayhanayas.com') + '/posts/' + post.slug)}`}
               target="_blank"
               className="h-10 w-10 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-[#0A66C2] hover:border-[#0A66C2]/20 transition-all"
+              title="Share on LinkedIn"
             >
-              <Linkedin className="h-4.5 w-4.5" />
+              <Send className="h-4.5 w-4.5" />
             </a>
           </div>
 
