@@ -99,6 +99,10 @@ export default function ProfileSettings() {
       }
 
       console.log('About to update profiles table')
+      // Refresh session first
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
+      if (sessionError) throw sessionError
+
       // Update database profile
       const { error } = await supabase
         .from('profiles')
@@ -110,7 +114,7 @@ export default function ProfileSettings() {
           adsense_pub_id: adsensePubId.trim(),
           adsense_slot_id: adsenseSlotId.trim(),
         })
-        .eq('id', user.id)
+        .match({ id: user.id })
 
       console.log('Update response:', { error })
       if (error) {
