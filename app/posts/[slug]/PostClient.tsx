@@ -233,7 +233,7 @@ export default function PostClient({
             {/* Typography core */}
             <div className="prose dark:prose-invert prose-zinc max-w-none leading-relaxed font-serif text-base sm:text-lg">
               {/* First Half */}
-              {firstHalfContent.split("\n").map((line: string, i) => {
+              {firstHalfContent.split("\n").map((line: string, i: number) => {
                 if (line.startsWith("# "))
                   return (
                     <h1
@@ -291,7 +291,7 @@ export default function PostClient({
               </div>
 
               {/* Second Half */}
-              {secondHalfContent.split("\n").map((line: string, i) => {
+              {secondHalfContent.split("\n").map((line: string, i: number) => {
                 if (line.startsWith("# "))
                   return (
                     <h1
