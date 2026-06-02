@@ -57,10 +57,11 @@ export default function AdminDashboard() {
           return;
         }
 
-        // Get current admin profile from the data
-        adminData.users.find(
+        // DÜZELTİLEN KISIM: find sonucunu const currentAdmin değişkenine atadık ve optional chaining ekledik
+        const currentAdmin = adminData.users.find(
           (u: any) => u.id === sessionResponse?.data?.session?.user?.id,
         );
+
         setCurrentProfile(currentAdmin);
         setProfiles(adminData.users || []);
       } catch (err: any) {
@@ -228,7 +229,7 @@ export default function AdminDashboard() {
 
           <div className="flex gap-2 self-start sm:self-auto">
             <span className="px-3.5 py-2 text-xs font-bold bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400">
-              Admin: {currentProfile?.full_name}
+              Admin: {currentProfile?.full_name || "Loading..."}
             </span>
           </div>
         </div>
@@ -270,7 +271,7 @@ export default function AdminDashboard() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={p.avatar_url}
-                                alt={p.full_name}
+                                alt={p.full_name || "User avatar"}
                                 className="h-full w-full rounded-full object-cover"
                               />
                             ) : (
@@ -282,7 +283,7 @@ export default function AdminDashboard() {
                               {p.full_name || "Anonymous User"}
                             </span>
                             <span className="text-[11px] text-zinc-500 block">
-                              ID: {p.id.slice(0, 8)}...
+                              ID: {p.id ? `${p.id.slice(0, 8)}...` : "N/A"}
                             </span>
                           </div>
                         </div>
