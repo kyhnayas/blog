@@ -53,13 +53,15 @@ export default function NewPost() {
           return;
         }
 
-        // DÜZELTİLEN KISIM: .single() eklenerek PostgrestBuilder nesnesi saf bir Promise'e dönüştürüldü.
-        const roleResponse = await withTimeout(
-          supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", session.user.id)
-            .single(),
+        // KESİN ÇÖZÜM: Supabase isteği anonim bir asenkron fonksiyon ile sarmalanarak %100 saf bir Promise tipine dönüştürüldü.
+        const roleResponse: any = await withTimeout(
+          (async () => {
+            return await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", session.user.id)
+              .single();
+          })(),
         );
 
         if (roleResponse.error || !roleResponse.data) {
