@@ -20,25 +20,21 @@ export default function EditorDashboard() {
   useEffect(() => {
     async function loadEditorData() {
       try {
-        // 1. Get current session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError || !session) {
+        // Get session first
+        const sessionResponse = await supabase.auth.getSession()
+        if (!sessionResponse.data?.session) {
           router.push('/login?error=Please login to view dashboard')
           return
         }
 
-        // 2. Fetch profile to check if role is editor or admin
-        const { data: prof, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        // 1. Fetch dashboard data via API (profile + posts + follower count)
+        const dashboardResponse = await fetch('/api/dashboard')
+        const dashboardData = await dashboardResponse.json()
 
-        if (profileError || !prof) {
-          setMessage({ 
-            type: 'error', 
-            text: 'Profile details not found in the database. Please visit Settings first to ensure your profile is initialized.' 
+        if (!dashboardResponse.ok) {
+          setMessage({
+            type: 'error',
+            text: 'Profile details not found in the database. Please visit Settings first to ensure your profile is initialized.'
           })
           setTimeout(() => {
             router.push('/settings')
@@ -46,28 +42,13 @@ export default function EditorDashboard() {
           return
         }
 
-        if (prof.role !== 'editor' && prof.role !== 'admin') {
-          router.push('/settings?message=Become an Editor to access the publishing dashboard')
-          return
-        }
-
+        const prof = dashboardData.profile
         setProfile(prof)
+        setPosts(dashboardData.posts || [])
 
-        // 3. Fetch editor's posts
-        const { data: editorPosts, error: postsError } = await supabase
-          .from('posts')
-          .select('*')
-          .eq('author_id', session.user.id)
-          .order('created_at', { ascending: false })
-
-        if (postsError) {
-          setMessage({ type: 'error', text: 'Failed to load your articles.' })
-        } else {
-          setPosts(editorPosts || [])
-        }
       } catch (err: any) {
         console.error('Dashboard loading error:', err)
-        setMessage({ type: 'error', text: err.message || 'Database connection timeout.' })
+        setMessage({ type: 'error', text: 'Failed to load dashboard. Please try again.' })
       } finally {
         setLoading(false)
       }
@@ -85,16 +66,20 @@ export default function EditorDashboard() {
     setMessage(null)
 
     try {
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId)
+      const deleteResponse = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+      })
 
-      if (error) throw error
+      const data = await deleteResponse.json()
+
+      if (!deleteResponse.ok) {
+        throw new Error(data.error || 'Failed to delete article')
+      }
 
       setPosts(prev => prev.filter(p => p.id !== postId))
       setMessage({ type: 'success', text: 'Article deleted successfully.' })
     } catch (err: any) {
+      console.error('Delete error:', err)
       setMessage({ type: 'error', text: err.message || 'Failed to delete article.' })
     } finally {
       setDeletingId(null)

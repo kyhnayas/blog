@@ -23,41 +23,28 @@ export default function AdminDashboard() {
     async function checkAdminAndLoadData() {
       try {
         // 1. Get current session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError || !session) {
+        const sessionResponse = await supabase.auth.getSession()
+        if (!sessionResponse.data?.session) {
           router.push('/login?error=Please login to view admin panel')
           return
         }
 
-        setCurrentUser(session.user)
+        setCurrentUser(sessionResponse.data.session.user)
 
-        // 2. Fetch current user profile to verify role
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        // 2. Load admin data via API (users list + current profile check)
+        const adminResponse = await fetch('/api/admin/users')
+        const adminData = await adminResponse.json()
 
-        if (profileError || !profile || profile.role !== 'admin') {
+        if (!adminResponse.ok) {
           router.push('/settings?message=Only administrators can access the admin dashboard.')
           return
         }
 
-        setCurrentProfile(profile)
+        // Get current admin profile from the data
+        const currentAdmin = adminData.users.find((u: any) => u.id === sessionResponse.data.session.user.id)
+        setCurrentProfile(currentAdmin)
+        setProfiles(adminData.users || [])
 
-        // 3. Load all registered profiles
-        const { data: allProfiles, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('role', { ascending: true })
-          .order('full_name', { ascending: true })
-
-        if (fetchError) {
-          setMessage({ type: 'error', text: 'Failed to fetch user profiles.' })
-        } else {
-          setProfiles(allProfiles || [])
-        }
       } catch (err: any) {
         console.error('Admin loading error:', err)
         setMessage({ type: 'error', text: err.message || 'Unexpected connection error.' })
@@ -81,14 +68,20 @@ export default function AdminDashboard() {
         throw new Error("You cannot change your own admin role!")
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: nextRole })
-        .eq('id', targetUserId)
+      // Update role via API
+      const updateResponse = await fetch(`/api/admin/users/${targetUserId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: nextRole }),
+      })
 
-      if (error) throw error
+      const data = await updateResponse.json()
 
-      setProfiles(prev => 
+      if (!updateResponse.ok) {
+        throw new Error(data.error || 'Failed to update user role')
+      }
+
+      setProfiles(prev =>
         prev.map(p => p.id === targetUserId ? { ...p, role: nextRole } : p)
       )
 
@@ -97,10 +90,8 @@ export default function AdminDashboard() {
         text: `Successfully updated user role to ${nextRole.toUpperCase()}`,
       })
     } catch (err: any) {
-      setMessage({
-        type: 'error',
-        text: err.message || 'Failed to update user role.',
-      })
+      console.error('Toggle role error:', err)
+      setMessage({ type: 'error', text: err.message || 'Failed to update user role.' })
     } finally {
       setUpdatingId(null)
     }

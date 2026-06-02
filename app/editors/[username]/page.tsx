@@ -29,59 +29,50 @@ export default function EditorProfile({ params }: { params: Promise<{ username: 
       setLoading(true)
       try {
         // 1. Fetch current logged-in user session
-        const { data: { session } } = await supabase.auth.getSession()
-        setCurrentUser(session?.user ?? null)
+        const sessionResponse = await supabase.auth.getSession()
+        setCurrentUser(sessionResponse.data?.session?.user ?? null)
 
-        // 2. Fetch editor profile details based on username
-        const { data: editorData, error: editorError } = await supabase
+        // 2. Fetch editor profile details - need to use supabase directly since API doesn't have by-username endpoint
+        const editorResponse = await supabase
           .from('profiles')
           .select('*')
           .eq('username', username.toLowerCase().trim())
           .single()
 
-        if (editorError || !editorData) {
+        if (editorResponse.error || !editorResponse.data) {
           throw new Error('Editor profile not found.')
         }
 
+        const editorData = editorResponse.data
         setEditor(editorData)
 
         // 3. Fetch editor's published articles
-        const { data: editorPosts, error: postsError } = await supabase
+        const postsResponse = await supabase
           .from('posts')
           .select('*')
           .eq('author_id', editorData.id)
           .eq('published', true)
           .order('published_at', { ascending: false })
 
-        if (!postsError) {
-          setPosts(editorPosts || [])
+        if (!postsResponse.error) {
+          setPosts(postsResponse.data || [])
         }
 
-        // 4. Fetch follower count
-        const { count, error: countError } = await supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('editor_id', editorData.id)
+        // 4. Fetch follower count - use follow status API
+        const followStatusResponse = await fetch(`/api/follow/status?editor_id=${editorData.id}`)
+        const followStatusData = await followStatusResponse.json()
 
-        if (!countError && count !== null) {
-          setFollowerCount(count)
-        }
+        if (followStatusResponse.ok) {
+          setFollowerCount(followStatusData.follower_count || 0)
 
-        // 5. If logged in, check if currently following
-        if (session?.user) {
-          const { data: followRecord, error: followCheckError } = await supabase
-            .from('follows')
-            .select('*')
-            .eq('follower_id', session.user.id)
-            .eq('editor_id', editorData.id)
-            .maybeSingle()
-
-          if (!followCheckError && followRecord) {
-            setIsFollowing(true)
+          // 5. If logged in, set following status
+          if (sessionResponse.data?.session?.user) {
+            setIsFollowing(followStatusData.is_following || false)
           }
         }
 
       } catch (err: any) {
+        console.error('Load editor error:', err)
         setMessage({ type: 'error', text: err.message || 'Failed to load profile details.' })
       } finally {
         setLoading(false)
@@ -107,34 +98,42 @@ export default function EditorProfile({ params }: { params: Promise<{ username: 
 
     try {
       if (isFollowing) {
-        // UNFOLLOW (delete follow record)
-        const { error } = await supabase
-          .from('follows')
-          .delete()
-          .eq('follower_id', currentUser.id)
-          .eq('editor_id', editor.id)
+        // UNFOLLOW via API
+        const deleteResponse = await fetch('/api/follow', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editor_id: editor.id }),
+        })
 
-        if (error) throw error
+        const data = await deleteResponse.json()
+
+        if (!deleteResponse.ok) {
+          throw new Error(data.error || 'Failed to unfollow')
+        }
 
         setIsFollowing(false)
         setFollowerCount(prev => Math.max(0, prev - 1))
         setMessage({ type: 'success', text: `You unfollowed @${editor.username}` })
       } else {
-        // FOLLOW (insert follow record)
-        const { error } = await supabase
-          .from('follows')
-          .insert([{
-            follower_id: currentUser.id,
-            editor_id: editor.id
-          }])
+        // FOLLOW via API
+        const insertResponse = await fetch('/api/follow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editor_id: editor.id }),
+        })
 
-        if (error) throw error
+        const data = await insertResponse.json()
+
+        if (!insertResponse.ok) {
+          throw new Error(data.error || 'Failed to follow')
+        }
 
         setIsFollowing(true)
         setFollowerCount(prev => prev + 1)
         setMessage({ type: 'success', text: `You are now following @${editor.username}!` })
       }
     } catch (err: any) {
+      console.error('Follow error:', err)
       setMessage({ type: 'error', text: err.message || 'Follow action failed. Please try again.' })
     } finally {
       setFollowMutating(false)

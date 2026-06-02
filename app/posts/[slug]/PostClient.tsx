@@ -43,37 +43,40 @@ export default function PostClient({
 
   useEffect(() => {
     async function initUserAndIncrementViews() {
-      // 1. Get current logged-in user
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setCurrentUser(session?.user ?? null);
-
-      // 2. Increment views securely on mount
       try {
-        await supabase.rpc("increment_post_views", { post_id: post.id });
-        setViews((prev: number) => prev + 1);
-      } catch (err) {
-        console.error("Failed to increment post views:", err);
-      }
+        // 1. Get current logged-in user
+        const response = await supabase.auth.getSession();
+        setCurrentUser(response.data?.session?.user ?? null);
 
-      // 3. Check if following author
-      if (session?.user) {
-        const { data: followRecord } = await supabase
-          .from("follows")
-          .select("*")
-          .eq("follower_id", session.user.id)
-          .eq("editor_id", author.id)
-          .maybeSingle();
-
-        if (followRecord) {
-          setIsFollowing(true);
+        // 2. Increment views via API
+        try {
+          await fetch('/api/views', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ post_id: post.id }),
+          });
+          setViews((prev: number) => prev + 1);
+        } catch (err) {
+          console.error("Failed to increment post views:", err);
         }
+
+        // 3. Check if following author
+        if (response.data?.session?.user) {
+          const followStatusResponse = await fetch(`/api/follow/status?editor_id=${author.id}`);
+          const followStatusData = await followStatusResponse.json();
+
+          if (followStatusResponse.ok) {
+            setIsFollowing(followStatusData.is_following || false);
+            setFollowerCount(followStatusData.follower_count || initialFollowers);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to initialize user:", err);
       }
     }
 
     initUserAndIncrementViews();
-  }, [supabase, post.id, author.id]);
+  }, [supabase, post.id, author.id, initialFollowers]);
 
   const handleFollowToggle = async () => {
     if (!currentUser) {
@@ -91,22 +94,35 @@ export default function PostClient({
 
     try {
       if (isFollowing) {
-        await supabase
-          .from("follows")
-          .delete()
-          .eq("follower_id", currentUser.id)
-          .eq("editor_id", author.id);
+        // Unfollow via API
+        const deleteResponse = await fetch('/api/follow', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editor_id: author.id }),
+        });
+
+        const data = await deleteResponse.json();
+
+        if (!deleteResponse.ok) {
+          throw new Error(data.error || 'Failed to unfollow');
+        }
 
         setIsFollowing(false);
         setFollowerCount((prev) => Math.max(0, prev - 1));
         setMessage({ type: "success", text: `Unfollowed @${author.username}` });
       } else {
-        await supabase.from("follows").insert([
-          {
-            follower_id: currentUser.id,
-            editor_id: author.id,
-          },
-        ]);
+        // Follow via API
+        const insertResponse = await fetch('/api/follow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editor_id: author.id }),
+        });
+
+        const data = await insertResponse.json();
+
+        if (!insertResponse.ok) {
+          throw new Error(data.error || 'Failed to follow');
+        }
 
         setIsFollowing(true);
         setFollowerCount((prev) => prev + 1);
@@ -116,7 +132,8 @@ export default function PostClient({
         });
       }
     } catch (err: any) {
-      setMessage({ type: "error", text: "Action failed. Please try again." });
+      console.error("Follow error:", err);
+      setMessage({ type: "error", text: err.message || "Action failed. Please try again." });
     } finally {
       setFollowMutating(false);
     }

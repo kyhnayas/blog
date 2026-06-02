@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
+// For session-aware operations (auth context preserved)
 export async function createClient() {
   const cookieStore = await cookies()
 
@@ -25,5 +27,13 @@ export async function createClient() {
         },
       },
     }
+  )
+}
+
+// For RLS bypass (admin/system operations) - use service role key
+export function createAdminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }

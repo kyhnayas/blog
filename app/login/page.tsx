@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { withTimeout, TimeoutError } from "@/lib/utils/timeout";
 import {
   Mail,
   Lock,
@@ -49,13 +50,16 @@ function LoginForm() {
 
     try {
       if (useMagicLink) {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
-        });
-        if (error) throw error;
+        const response = await withTimeout(
+          supabase.auth.signInWithOtp({
+            email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          }),
+          10000
+        );
+        if (response.error) throw response.error;
         setMessage({
           type: "success",
           text: "We sent a Magic Link to your email. Please check your inbox and spam folder!",
@@ -64,28 +68,34 @@ function LoginForm() {
         if (!username || username.length < 3) {
           throw new Error("Username must be at least 3 characters long");
         }
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: {
-              username: username.toLowerCase().trim(),
-              full_name: fullName.trim(),
+        const response = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              data: {
+                username: username.toLowerCase().trim(),
+                full_name: fullName.trim(),
+              },
             },
-          },
-        });
-        if (error) throw error;
+          }),
+          10000
+        );
+        if (response.error) throw response.error;
         setMessage({
           type: "success",
           text: "Registration successful! Please check your email to confirm your account.",
         });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        const response = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          10000
+        );
+        if (response.error) throw response.error;
 
         setMessage({
           type: "success",
@@ -97,9 +107,13 @@ function LoginForm() {
         }, 1500);
       }
     } catch (err: any) {
+      console.error('Auth error:', err);
+      const errorMsg = err instanceof TimeoutError
+        ? 'Authentication request timed out. Please check your connection and try again.'
+        : err.message || "An error occurred during authentication.";
       setMessage({
         type: "error",
-        text: err.message || "An error occurred during authentication.",
+        text: errorMsg,
       });
     } finally {
       setLoading(false);

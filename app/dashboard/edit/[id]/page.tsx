@@ -30,49 +30,54 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     async function loadPostData() {
-      // 1. Get current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError || !session) {
-        router.push('/login?error=Please login to edit a post')
-        return
+      try {
+        // 1. Get current session
+        const sessionResponse = await supabase.auth.getSession()
+        if (!sessionResponse.data?.session) {
+          router.push('/login?error=Please login to edit a post')
+          return
+        }
+
+        setUser(sessionResponse.data.session.user)
+
+        // 2. Fetch post via API
+        const postResponse = await fetch(`/api/posts/${id}`)
+        const postData = await postResponse.json()
+
+        if (!postResponse.ok || !postData.post) {
+          router.push('/dashboard?error=Article not found')
+          return
+        }
+
+        const post = postData.post
+
+        // 3. Verify authorization
+        const roleResponse = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', sessionResponse.data.session.user.id)
+          .single()
+
+        const profile = roleResponse.data
+
+        if (post.author_id !== sessionResponse.data.session.user.id && profile?.role !== 'admin') {
+          router.push('/dashboard?error=You are not authorized to edit this article')
+          return
+        }
+
+        // Pre-populate fields
+        setTitle(post.title || '')
+        setSlug(post.slug || '')
+        setSummary(post.summary || '')
+        setContent(post.content || '')
+        setImageUrl(post.image_url || '')
+        setPublished(post.published || false)
+
+        setLoading(false)
+      } catch (err: any) {
+        console.error('Load post error:', err)
+        router.push(`/dashboard?error=${encodeURIComponent('Failed to load article. Please try again.')}`)
       }
-
-      setUser(session.user)
-
-      // 2. Fetch current post details
-      const { data: post, error: postError } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (postError || !post) {
-        router.push('/dashboard?error=Article not found')
-        return
-      }
-
-      // 3. Verify user is author or admin
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single()
-
-      if (post.author_id !== session.user.id && profile?.role !== 'admin') {
-        router.push('/dashboard?error=You are not authorized to edit this article')
-        return
-      }
-
-      // Pre-populate fields
-      setTitle(post.title || '')
-      setSlug(post.slug || '')
-      setSummary(post.summary || '')
-      setContent(post.content || '')
-      setImageUrl(post.image_url || '')
-      setPublished(post.published || false)
-
-      setLoading(false)
     }
 
     loadPostData()
@@ -101,25 +106,27 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
       if (!slug.trim()) throw new Error('Please enter a valid URL slug.')
       if (!content.trim()) throw new Error('Please write some content for the article.')
 
-      // Update post in database
-      const { error } = await supabase
-        .from('posts')
-        .update({
+      // Update post via API
+      const updateResponse = await fetch(`/api/posts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title: title.trim(),
           slug: slug.trim(),
           summary: summary.trim(),
           content: content.trim(),
-          image_url: imageUrl.trim() || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&auto=format&fit=crop&q=60',
+          imageUrl: imageUrl.trim() || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&auto=format&fit=crop&q=60',
           published,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
+        }),
+      })
 
-      if (error) {
-        if (error.code === '23505') {
+      const data = await updateResponse.json()
+
+      if (!updateResponse.ok) {
+        if (data.error?.includes('slug')) {
           throw new Error('This URL slug is already taken by another article. Please modify the slug.')
         }
-        throw error
+        throw new Error(data.error || 'Failed to update article')
       }
 
       setMessage({ type: 'success', text: 'Article updated successfully!' })
@@ -129,6 +136,7 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
       }, 1500)
 
     } catch (err: any) {
+      console.error('Save error:', err)
       setMessage({ type: 'error', text: err.message || 'Failed to update article.' })
     } finally {
       setSaving(false)

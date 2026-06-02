@@ -29,30 +29,26 @@ export default function ProfileSettings() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        // 1. Get current session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError || !session) {
+        // Get session first
+        const sessionResponse = await supabase.auth.getSession()
+        if (!sessionResponse.data?.session) {
           router.push('/login?error=Please login to view settings')
           return
         }
 
-        setUser(session.user)
+        setUser(sessionResponse.data.session.user)
 
-        // 2. Fetch profile from database
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        // 1. Fetch profile via API
+        const profileResponse = await fetch('/api/profile')
+        const profileData = await profileResponse.json()
 
-        if (profileError) {
-          // Display clear notice if profile doesn't exist (e.g. trigger failed or manual dashboard creation)
-          setMessage({ 
-            type: 'error', 
-            text: 'Profile record not found in the database. If you registered without email confirmation, please try logging out and logging back in, or check if the trigger function was executed on Supabase.' 
+        if (!profileResponse.ok) {
+          setMessage({
+            type: 'error',
+            text: 'Profile record not found in the database. If you registered without email confirmation, please try logging out and logging back in, or check if the trigger function was executed on Supabase.'
           })
-        } else if (profile) {
+        } else if (profileData.profile) {
+          const profile = profileData.profile
           setUsername(profile.username || '')
           setFullName(profile.full_name || '')
           setBio(profile.bio || '')
@@ -62,18 +58,19 @@ export default function ProfileSettings() {
           setRole(profile.role || 'reader')
         }
 
-        // 3. Fetch follower count
-        const { count, error: countError } = await supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('editor_id', session.user.id)
+        // 2. Fetch follower count via API
+        const followersResponse = await fetch('/api/profile/followers')
+        const followersData = await followersResponse.json()
 
-        if (!countError && count !== null) {
-          setFollowerCount(count)
+        if (followersResponse.ok && followersData.count !== undefined) {
+          setFollowerCount(followersData.count)
         }
       } catch (err: any) {
         console.error('Settings load error:', err)
-        setMessage({ type: 'error', text: err.message || 'Failed to establish connection to database.' })
+        setMessage({
+          type: 'error',
+          text: 'Failed to load profile settings. Please try again.',
+        })
       } finally {
         setLoading(false)
       }
@@ -98,30 +95,29 @@ export default function ProfileSettings() {
         throw new Error('Username must be at least 3 characters long.')
       }
 
-      console.log('About to update profiles table')
-      // Refresh session first
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
-      if (sessionError) throw sessionError
+      console.log('About to update profiles via API route')
 
-      // Update database profile
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          username: username.toLowerCase().trim(),
-          full_name: fullName.trim(),
-          bio: bio.trim(),
-          avatar_url: avatarUrl.trim(),
-          adsense_pub_id: adsensePubId.trim(),
-          adsense_slot_id: adsenseSlotId.trim(),
-        })
-        .eq('id', user.id)
-        .select()
+      // Update profile via server-side API using PUT
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          fullName,
+          bio,
+          avatarUrl,
+          adsensePubId,
+          adsenseSlotId,
+        }),
+      })
 
-      console.log('Update response:', { error })
-      if (error) {
-        console.error('Update error:', error)
-        throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update profile')
       }
+
+      console.log('Update response: success')
 
       setMessage({ type: 'success', text: 'Your profile settings have been updated successfully!' })
       router.refresh()
