@@ -53,7 +53,7 @@ export default function NewPost() {
           return;
         }
 
-        // Check role with timeout
+        // DÜZELTİLEN KISIM: .single() eklenerek PostgrestBuilder nesnesi saf bir Promise'e dönüştürüldü.
         const roleResponse = await withTimeout(
           supabase
             .from("profiles")
@@ -295,7 +295,6 @@ export default function NewPost() {
                 <div className="bg-zinc-950/60 border border-zinc-850 rounded-2xl p-6 min-h-[384px] overflow-y-auto max-h-[500px]">
                   {content ? (
                     <article className="prose prose-invert prose-sm max-w-none prose-headings:font-bold prose-a:text-primary-400 prose-blockquote:border-primary-500 prose-blockquote:bg-zinc-900/30 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-xl">
-                      {/* Simple client-side rendering helper for headers, bold, and linebreaks in preview */}
                       {content.split("\n").map((line, i) => {
                         if (line.startsWith("# "))
                           return (
@@ -378,7 +377,7 @@ export default function NewPost() {
                   type="url"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="[https://images.unsplash.com/](https://images.unsplash.com/)..."
                   className="block w-full px-3 py-2.5 bg-zinc-950/60 border border-zinc-850 rounded-xl text-white placeholder-zinc-650 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 text-xs"
                 />
                 <p className="text-[10px] text-zinc-500">
