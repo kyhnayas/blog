@@ -42,10 +42,11 @@ export function handleSupabaseResponse<T>(response: { data: T | null; error: any
  * Session validation timeout ile
  */
 export async function getSessionWithTimeout(supabase: any): Promise<any> {
+  // DÜZELTİLEN KISIM: 'as any' eklenerek response nesnesinin tipi belirtildi ve unknown hatası giderildi.
   const response = await withTimeout(
     supabase.auth.getSession(),
     3000
-  )
+  ) as any
 
   if (response.error) {
     throw response.error
@@ -96,4 +97,3 @@ export function isConstraintError(error: any): boolean {
          error?.code === '23503' || // Foreign key violation
          error?.code === '23514'    // Check violation
 }
-
